@@ -1,41 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 
 function App() {
-  const [messages, setMessages] = useState([]);
+  const [lat, setLat] = useState(null);
+  const [lon, setLon] = useState(null);
   const [userInput, setUserInput] = useState("");
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Hard-code lat/lon for demonstration
-  const LAT = "37.7749";
-  const LON = "-122.4194";
+  // Get user's current location on component mount
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLat(position.coords.latitude);
+          setLon(position.coords.longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Location access is needed for weather suggestions.");
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
+  }, []);
 
   const handleSend = async () => {
     if (!userInput.trim()) return;
+    if (lat === null || lon === null) {
+      alert("Location not available yet!");
+      return;
+    }
 
-    // Add user's message to the chat
+    setLoading(true);
     const newMessages = [...messages, { sender: "user", text: userInput }];
     setMessages(newMessages);
     setUserInput("");
-    setLoading(true);
 
     try {
-      // Call your Flask backend
+      // Replace the URL below with your live backend URL if deployed.
       const url = `http://127.0.0.1:5000/get-ai-suggestion?query=${encodeURIComponent(
         userInput
-      )}&lat=${LAT}&lon=${LON}`;
+      )}&lat=${lat}&lon=${lon}`;
+
       const response = await fetch(url);
       const data = await response.json();
 
-      // Check AI response
       if (data.choices && data.choices.length > 0) {
         const aiText = data.choices[0].message.content;
         setMessages([...newMessages, { sender: "bot", text: aiText }]);
       } else {
-        // Fallback if no AI message
         setMessages([
           ...newMessages,
-          { sender: "bot", text: "Sorry, I couldn't fetch an answer." },
+          { sender: "bot", text: "Sorry, no AI response received." },
         ]);
       }
     } catch (error) {
@@ -54,10 +72,7 @@ function App() {
       <h1 className="title">🌤️ Weather Chatbot</h1>
       <div className="chat-box">
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`chat-message ${msg.sender === "user" ? "user" : "bot"}`}
-          >
+          <div key={idx} className={`chat-message ${msg.sender === "user" ? "user" : "bot"}`}>
             <p>{msg.text}</p>
           </div>
         ))}
@@ -67,7 +82,6 @@ function App() {
           </div>
         )}
       </div>
-
       <div className="input-row">
         <input
           type="text"
